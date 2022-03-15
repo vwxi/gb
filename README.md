@@ -26,8 +26,6 @@ a game boy emulator written in C
 - minimal UI (will upgrade eventually)
 - support for no mapper, MBC1
 
-## games tested
-
 ## how to use
 
 i'm not sure i'll figure it out eventually, needs SDL2 .lib's and .dll's
