@@ -6,8 +6,7 @@ struct cart {
 	u8 MBC;
 	
 	u8 rom_bank;
-	u8 rom_bank_upper;
-
+	
 	u8 zero_bank;
 	u8 high_bank;
 

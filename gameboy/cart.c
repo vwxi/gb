@@ -1,6 +1,6 @@
 #include "cart.h"
 
-const u8 mbc1_masks[7] = {
+const u8 mbc_masks[7] = {
 	0x00, 0x03, 0x07, 0x0f, 0x1f, 0x1f, 0x1f
 };
 
@@ -9,6 +9,7 @@ int cart_load(struct cart* cart, FILE* fp, long sz)
 	size_t rd = 0;
 
 	cart->rom_size = sz;
+	cart->rom_bank = 1;
 	cart->zero_bank = 0;
 	cart->high_bank = 1;
 	cart->ram_bank = 0;
@@ -48,7 +49,7 @@ int cart_ram_init(struct cart* cart)
 		0, 0x800, 0x2000, 0x8000, 0x200000
 	};
 
-	cart->ram_size = ram_sizes[cart->ram_bank_count];
+	cart->ram_size = (cart->MBC != 2) ? ram_sizes[cart->ram_bank_count] : ram_sizes[1];
 
 	printf("ram size %#x\n", cart->ram_size);
 
@@ -69,6 +70,10 @@ int cart_get_mbc_type(struct cart* cart)
 	case 0x1: case 0x2: case 0x3:
 		cart->MBC = 1;
 		puts("mapper: mbc1");
+		break;
+	case 0x5: case 0x6:
+		cart->MBC = 2;
+		puts("mapper: mbc2");
 		break;
 	default:
 		printf("unsupported, type: %x\n", cart->ROM[0x147]);
@@ -124,7 +129,7 @@ u8 mbc1_read(struct cart* cart, u16 addr)
 
 void mbc1_write(struct cart* cart, u16 addr, u8 val)
 {
-	/* ram enable*/
+	/* ram enable */
 	if (addr <= 0x1fff)
 		cart->ram_enable = (val & 0xf) == 0xa;
 
@@ -132,7 +137,7 @@ void mbc1_write(struct cart* cart, u16 addr, u8 val)
 	if (addr >= 0x2000 && addr <= 0x3fff) {
 		cart->rom_bank = val & 0x1f;
 		if (!cart->rom_bank) cart->rom_bank = 1;
-		cart->rom_bank &= mbc1_masks[cart->rom_bank_count];
+		cart->rom_bank &= mbc_masks[cart->rom_bank_count];
 
 		if (cart->rom_bank_count <= 4) {
 			cart->zero_bank = 0;
@@ -150,6 +155,7 @@ void mbc1_write(struct cart* cart, u16 addr, u8 val)
 		}
 	}
 
+	/* ram bank OR upper rom bank bits */
 	if (addr >= 0x4000 && addr <= 0x5fff)
 		cart->ram_bank = val & 3;
 
@@ -168,11 +174,50 @@ void mbc1_write(struct cart* cart, u16 addr, u8 val)
 
 }
 
+u8 mbc2_read(struct cart* cart, u16 addr)
+{
+	/* ROM bank 00 */
+	if (addr <= 0x3fff)
+		return cart->ROM[addr];
+
+	/* ROM bank 01-0f */
+	if (addr >= 0x4000 && addr <= 0x7fff)
+		return cart->ROM[(addr - 0x4000) + (cart->rom_bank * 0x4000)];
+
+	/* internal RAM */
+	if (addr >= 0xa000 && addr <= 0xbfff)
+		if (cart->ram_enable)
+			return 0xf0 | cart->RAM[addr & 0x1ff];
+
+	return 0xff;
+}
+
+void mbc2_write(struct cart* cart, u16 addr, u8 val)
+{
+	if (addr <= 0x3fff) {
+		if (addr & 0x100) {
+			/* ROM bank */
+			cart->rom_bank = val & 0xf;
+			if (!cart->rom_bank) cart->rom_bank = 1;
+			cart->rom_bank &= mbc_masks[cart->rom_bank_count];
+		}
+		else {
+			/* RAM enable */
+			cart->ram_enable = (val & 0xf) == 0xa;
+		}
+	}
+
+	if (addr >= 0xa000 && addr <= 0xbfff)
+		if(cart->ram_enable)
+			cart->RAM[addr & 0x1ff] = val & 0xf;
+}
+
 u8 cart_read(struct cart* cart, u16 addr)
 {
 	switch (cart->MBC) {
 	case 0: return nombc_read(cart, addr);
 	case 1: return mbc1_read(cart, addr);
+	case 2: return mbc2_read(cart, addr);
 	}
 
 	return 0xff;
@@ -183,5 +228,6 @@ void cart_write(struct cart* cart, u16 addr, u8 val)
 	switch (cart->MBC) {
 	case 0: nombc_write(cart, addr, val); break;
 	case 1: mbc1_write(cart, addr, val); break;
+	case 2: mbc2_write(cart, addr, val); break;
 	}
 }

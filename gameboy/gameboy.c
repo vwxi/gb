@@ -21,20 +21,20 @@ int gb_init(char** argv)
 	sz = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
 
-	printf("ROM size %u bytes\n", sz);
-
 	if (!cart_load(&gb.cart, fp, sz)) {
 		fclose(fp);
 		return 0;
 	}
 
-	if (!cart_ram_init(&gb.cart)) {
-		printf("RAM allocation failure\n");
+	if (!cart_get_mbc_type(&gb.cart)) {
+		printf("could not get MBC type\n");
 		goto end;
 	}
 
-	if (!cart_get_mbc_type(&gb.cart)) {
-		printf("could not get MBC type\n");
+	printf("rom size %#x\n", sz);
+
+	if (!cart_ram_init(&gb.cart)) {
+		printf("RAM allocation failure\n");
 		goto end;
 	}
 
