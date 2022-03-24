@@ -75,6 +75,15 @@ int cart_get_mbc_type(struct cart* cart)
 		cart->MBC = 2;
 		puts("mapper: mbc2");
 		break;
+	case 0xf: case 0x10:
+		cart->MBC = 3;
+		puts("mapper: mbc3");
+		break;
+	case 0x11: case 0x12: case 0x13:
+		puts("mapper: mbc3+rtc");
+		cart->rtc_enabled = 1;
+		cart->MBC = 3;
+		break;
 	default:
 		printf("unsupported, type: %x\n", cart->ROM[0x147]);
 		cart->MBC = 0xff;
@@ -212,12 +221,80 @@ void mbc2_write(struct cart* cart, u16 addr, u8 val)
 			cart->RAM[addr & 0x1ff] = val & 0xf;
 }
 
+void mbc3_update_rtc(struct cart* cart)
+{
+	/*update RTC registers*/
+}
+
+u8 mbc3_read(struct cart* cart, u16 addr)
+{
+	if (addr <= 0x3fff)
+		return cart->ROM[addr];
+
+	if (addr >= 0x4000 && addr <= 0x7fff)
+		return cart->ROM[(addr - 0x4000) + (cart->rom_bank * 0x4000)];
+
+	if (addr >= 0xa000 && addr <= 0xbfff)
+		if (cart->RAM && cart->ram_enable)
+			return cart->RAM[(addr - 0xa000) + (cart->ram_bank * 0x2000)];
+		else if(cart->rtc_enabled)
+			switch (cart->rtc_register) {
+			case 0x08: return cart->rtc_seconds; break;
+			case 0x09: return cart->rtc_minutes; break;
+			case 0x0a: return cart->rtc_hours; break;
+			case 0x0b: return cart->rtc_dl; break;
+			case 0x0c: return cart->rtc_dh; break;
+			}
+
+	return 0xff;
+}
+
+void mbc3_write_rtc(struct cart* cart, u16 addr, u8 val)
+{
+	/*write RTC registers, update too*/
+}
+
+void mbc3_write(struct cart* cart, u16 addr, u8 val)
+{
+	if (addr <= 0x1fff)
+		if(cart->RAM)
+			cart->ram_enable = (val & 0xf) == 0xa;
+
+	if (addr >= 0x2000 && addr <= 0x3fff) {
+		if (!val) val = 1;
+		cart->rom_bank = val & 0x7f;
+	}
+
+	if (addr >= 0x4000 && addr <= 0x5fff) {
+		if (val <= 3)
+			cart->ram_bank = val;
+		else if (val >= 8 && val <= 0xc)
+			cart->rtc_register = val;
+	}
+
+	if (addr >= 0x6000 && addr <= 0x7fff) {
+		if (cart->ram_enable && cart->rtc_latch == 0 && val == 1) {
+			mbc3_update_rtc(cart);
+		}
+
+		cart->rtc_latch = val;
+	}
+
+	if (addr >= 0xa000 && addr <= 0xbfff) {
+		if (cart->RAM && cart->ram_enable)
+			cart->RAM[(addr - 0xa000) + (cart->ram_bank * 0x2000)] = val;
+		else if (cart->rtc_enabled && cart->ram_enable)
+			mbc3_write_rtc(cart, addr, val);
+	}
+}
+
 u8 cart_read(struct cart* cart, u16 addr)
 {
 	switch (cart->MBC) {
 	case 0: return nombc_read(cart, addr);
 	case 1: return mbc1_read(cart, addr);
 	case 2: return mbc2_read(cart, addr);
+	case 3: return mbc3_read(cart, addr);
 	}
 
 	return 0xff;
@@ -229,5 +306,6 @@ void cart_write(struct cart* cart, u16 addr, u8 val)
 	case 0: nombc_write(cart, addr, val); break;
 	case 1: mbc1_write(cart, addr, val); break;
 	case 2: mbc2_write(cart, addr, val); break;
+	case 3: mbc3_write(cart, addr, val); break;
 	}
 }
