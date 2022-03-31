@@ -24,7 +24,7 @@ a game boy emulator written in C
 ## features
 
 - minimal UI (will upgrade eventually)
-- support for no mapper, MBC1, MBC2
+- support for no mapper, MBC1, MBC2, MBC3
 
 ## how to use
 
@@ -45,11 +45,12 @@ i use a scanline renderer, no fifo (yet)
 
 ## todo
 
-- add support for MBC3, MBC5 mappers
+- add support for MBC5 mapper
 - add audio
 - refactor
 - add to UI
 - let the end user build the project
+- implement MBC3 RTC
 
 ## thanks
 
