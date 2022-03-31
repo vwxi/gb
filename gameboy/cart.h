@@ -18,19 +18,20 @@ struct cart {
 	u8 ram_bank_count;
 
 	/* MBC3 */
-	u8 rtc_enabled;
+	u8 rtc_supported;
 
+	u8 rtc_mode;
 	u8 rtc_register;
 	u8 rtc_latch;
 
 	time_t rtc_time;
 	time_t rtc_old_time;
 
-	u8 rtc_seconds;
-	u8 rtc_minutes;
-	u8 rtc_hours;
-	u8 rtc_dl;
-	u8 rtc_dh;
+	u64 rtc_seconds;
+	u64 rtc_minutes;
+	u64 rtc_hours;
+	u64 rtc_days;
+	u8 rtc_ctrl;
 
 	long rom_size;
 	long ram_size;

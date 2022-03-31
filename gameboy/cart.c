@@ -13,6 +13,7 @@ int cart_load(struct cart* cart, FILE* fp, long sz)
 	cart->zero_bank = 0;
 	cart->high_bank = 1;
 	cart->ram_bank = 0;
+	cart->rtc_time = time(NULL);
 
 	cart->ROM = malloc(sz + 1);
 	if (!cart->ROM) {
@@ -81,7 +82,7 @@ int cart_get_mbc_type(struct cart* cart)
 		break;
 	case 0x11: case 0x12: case 0x13:
 		puts("mapper: mbc3+rtc");
-		cart->rtc_enabled = 1;
+		cart->rtc_supported = 1;
 		cart->MBC = 3;
 		break;
 	default:
@@ -224,6 +225,50 @@ void mbc2_write(struct cart* cart, u16 addr, u8 val)
 void mbc3_update_rtc(struct cart* cart)
 {
 	/*update RTC registers*/
+	time_t difference;
+
+	cart->rtc_old_time = cart->rtc_time;
+	cart->rtc_time = time(NULL);
+
+	difference = cart->rtc_time - cart->rtc_old_time;
+
+	if (cart->rtc_ctrl & 0x40)
+		return; /* timer halt bit*/
+
+	if (difference < 0 || cart->rtc_old_time == cart->rtc_time) {
+		return;
+	}
+
+	cart->rtc_seconds += difference % 60;
+	cart->rtc_minutes += (difference / 60) % 60;
+	cart->rtc_hours += (difference / 3600) % 24;
+	cart->rtc_days += difference / 86400;
+
+	if (cart->rtc_seconds > 59) {
+		cart->rtc_seconds -= 60;
+		cart->rtc_minutes++;
+	}
+
+	if (cart->rtc_minutes > 59) {
+		cart->rtc_minutes -= 60;
+		cart->rtc_hours++;
+	}
+
+	if (cart->rtc_hours > 23) {
+		cart->rtc_hours -= 24;
+		cart->rtc_days++;
+	}
+
+	if (cart->rtc_days == 0x100) {
+		cart->rtc_days -= 0x100;
+		if (cart->rtc_ctrl & 1) {
+			cart->rtc_ctrl &= ~1;
+			cart->rtc_ctrl |= 0x80;
+		}
+		else {
+			cart->rtc_ctrl |= 1;
+		}
+	}
 }
 
 u8 mbc3_read(struct cart* cart, u16 addr)
@@ -235,23 +280,20 @@ u8 mbc3_read(struct cart* cart, u16 addr)
 		return cart->ROM[(addr - 0x4000) + (cart->rom_bank * 0x4000)];
 
 	if (addr >= 0xa000 && addr <= 0xbfff)
-		if (cart->RAM && cart->ram_enable)
-			return cart->RAM[(addr - 0xa000) + (cart->ram_bank * 0x2000)];
-		else if(cart->rtc_enabled)
-			switch (cart->rtc_register) {
-			case 0x08: return cart->rtc_seconds; break;
-			case 0x09: return cart->rtc_minutes; break;
-			case 0x0a: return cart->rtc_hours; break;
-			case 0x0b: return cart->rtc_dl; break;
-			case 0x0c: return cart->rtc_dh; break;
-			}
+		if (cart->ram_enable) {
+			if (cart->rtc_supported && cart->rtc_mode)
+				switch (cart->rtc_register) {
+				case 0x08: return cart->rtc_seconds & 0xff; break;
+				case 0x09: return cart->rtc_minutes & 0xff; break;
+				case 0x0a: return cart->rtc_hours & 0xff; break;
+				case 0x0b: return cart->rtc_days & 0xff; break;
+				case 0x0c: return cart->rtc_ctrl & 0xc1; break;
+				}
+			else if(cart->RAM && !cart->rtc_mode)
+				return cart->RAM[(addr - 0xa000) + (cart->ram_bank * 0x2000)];
+		}
 
 	return 0xff;
-}
-
-void mbc3_write_rtc(struct cart* cart, u16 addr, u8 val)
-{
-	/*write RTC registers, update too*/
 }
 
 void mbc3_write(struct cart* cart, u16 addr, u8 val)
@@ -266,10 +308,14 @@ void mbc3_write(struct cart* cart, u16 addr, u8 val)
 	}
 
 	if (addr >= 0x4000 && addr <= 0x5fff) {
-		if (val <= 3)
+		if (val <= 3) {
 			cart->ram_bank = val;
-		else if (val >= 8 && val <= 0xc)
+			cart->rtc_mode = 0; /*RAM banking*/
+		}
+		else if (val >= 8 && val <= 0xc) {
 			cart->rtc_register = val;
+			cart->rtc_mode = 1; /*RTC registers*/
+		}
 	}
 
 	if (addr >= 0x6000 && addr <= 0x7fff) {
@@ -281,10 +327,18 @@ void mbc3_write(struct cart* cart, u16 addr, u8 val)
 	}
 
 	if (addr >= 0xa000 && addr <= 0xbfff) {
-		if (cart->RAM && cart->ram_enable)
-			cart->RAM[(addr - 0xa000) + (cart->ram_bank * 0x2000)] = val;
-		else if (cart->rtc_enabled && cart->ram_enable)
-			mbc3_write_rtc(cart, addr, val);
+		if (cart->ram_enable) {
+			if (cart->RAM && !cart->rtc_mode)
+				cart->RAM[(addr - 0xa000) + (cart->ram_bank * 0x2000)] = val;
+			else if (cart->rtc_supported && cart->rtc_mode)
+				switch (cart->rtc_register) {
+				case 0x08: cart->rtc_seconds = val; break;
+				case 0x09: cart->rtc_minutes = val; break;
+				case 0x0a: cart->rtc_hours = val; break;
+				case 0x0b: cart->rtc_days = val; break;
+				case 0x0c: cart->rtc_ctrl = val; break;
+				}
+		}
 	}
 }
 
