@@ -77,13 +77,13 @@ int cart_get_mbc_type(struct cart* cart)
 		puts("mapper: mbc2");
 		break;
 	case 0xf: case 0x10:
-		cart->MBC = 3;
-		puts("mapper: mbc3");
-		break;
-	case 0x11: case 0x12: case 0x13:
 		puts("mapper: mbc3+rtc");
 		cart->rtc_supported = 1;
 		cart->MBC = 3;
+		break;
+	case 0x11: case 0x12: case 0x13:
+		cart->MBC = 3;
+		puts("mapper: mbc3");
 		break;
 	default:
 		printf("unsupported, type: %x\n", cart->ROM[0x147]);
