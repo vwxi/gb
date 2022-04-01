@@ -4,6 +4,7 @@
 #include "mem.h"
 #include "cart.h"
 #include "lcd.h"
+#include "audio.h"
 #include "debugger.h"
 
 #define FRAME_CYCLES 70224
@@ -21,6 +22,7 @@ struct gameboy {
 	struct mmu mmu;
 	struct cart cart;
 	struct lcd lcd;
+	struct apu apu;
 
 	u8 dpad;
 	u8 buttons;

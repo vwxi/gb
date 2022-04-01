@@ -166,6 +166,7 @@
     <ClCompile Include="ops.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="audio.h" />
     <ClInclude Include="cart.h" />
     <ClInclude Include="cpu.h" />
     <ClInclude Include="debugger.h" />
