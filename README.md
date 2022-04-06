@@ -6,7 +6,7 @@ a game boy emulator written in C
 ![image](https://user-images.githubusercontent.com/98568521/158298033-345a2860-b02b-428f-82e4-e06b58b8851f.png)
 ![image](https://user-images.githubusercontent.com/98568521/158298126-305de85b-5682-46b4-8096-7b5802c60708.png)
 ![image](https://user-images.githubusercontent.com/98568521/158298285-0a612776-4af3-45ec-846e-d7cac3dd2bb7.png)
-![image](https://user-images.githubusercontent.com/98568521/158298377-87134bd4-d270-4a2c-aaa1-df2bddba6bd2.png)
+![image](https://user-images.githubusercontent.com/98568521/162076903-99361474-5f0c-470b-81dd-b13815122d01.png)
 ![image](https://user-images.githubusercontent.com/98568521/158298488-5bf50304-6d23-45a2-9596-ed9f6cfbf553.png)
 
 ## usage
