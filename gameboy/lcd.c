@@ -1,5 +1,4 @@
 #include "lcd.h"
-#include <conio.h>
 
 const u32 colors[4] = {
 	0xff4fbc9b, /*white*/
@@ -74,13 +73,39 @@ void lcd_destroy(struct lcd* lcd)
 
 void lcd_check_lyc(struct lcd* lcd)
 {
-	if (lcd->ly == lcd->lyc && lcd->stat & S_INT_LYC) {
+	if (lcd->ly == lcd->lyc) {
 		lcd->stat |= S_LYC;
-		lcd->cpu->IF |= STAT_INTERRUPT;
+		if (lcd->stat & S_INT_LYC)
+			lcd->cpu->IF |= STAT_INTERRUPT;
 	}
 	else {
 		lcd->stat &= ~S_LYC;
 	}
+}
+
+void lcd_mode(struct lcd* lcd, u8 mode)
+{
+	u8 int_enabled = 0;
+
+	lcd->stat &= ~S_MODE;
+	lcd->stat |= mode;
+
+	switch (mode) {
+	case HBLANK:
+		int_enabled = lcd->stat & S_INT_HBLANK;
+		break;
+
+	case VBLANK:
+		int_enabled = lcd->stat & S_INT_VBLANK;
+		break;
+
+	case OAMSCAN:
+		int_enabled = lcd->stat & S_INT_OAM;
+		break;
+	}
+
+	if (int_enabled)
+		lcd->cpu->IF |= STAT_INTERRUPT;
 }
 
 void lcd_tick(struct lcd* lcd, u8 cycles)
@@ -92,7 +117,7 @@ void lcd_tick(struct lcd* lcd, u8 cycles)
 		case OAMSCAN:
 			if (lcd->cycles >= 80) {
 				lcd->cycles -= 80;
-				MODE(LCDTRANSFER, 0);
+				lcd_mode(lcd, LCDTRANSFER);
 			}
 			
 			break;
@@ -100,7 +125,7 @@ void lcd_tick(struct lcd* lcd, u8 cycles)
 		case LCDTRANSFER:
 			if (lcd->cycles >= 172) {
 				lcd->cycles -= 172;
-				MODE(HBLANK, 3);
+				lcd_mode(lcd, HBLANK);
 				lcd_draw(lcd);
 			}
 
@@ -110,15 +135,16 @@ void lcd_tick(struct lcd* lcd, u8 cycles)
 			if (lcd->cycles >= 204) {
 				lcd->cycles -= 204;
 				if (++lcd->ly >= 144) {
-					MODE(VBLANK, 4);
+					lcd_mode(lcd, VBLANK);
 					lcd->cpu->IF |= VBLANK_INTERRUPT;
 				}
 				else {
-					MODE(OAMSCAN, 5);
+					lcd_mode(lcd, OAMSCAN);
 				}
 
 				lcd_check_lyc(lcd);
 			}
+
 			break;
 
 		case VBLANK:
@@ -126,10 +152,9 @@ void lcd_tick(struct lcd* lcd, u8 cycles)
 				lcd->cycles -= 456;
 				if (++lcd->ly == 154) {
 					lcd->ly = 0;
-					lcd->il = 0;
 					lcd->wilc = 0xff;
 					lcd_check_lyc(lcd);
-					MODE(OAMSCAN, 5);
+					lcd_mode(lcd, OAMSCAN);
 					lcd_paint(lcd);
 				}
 			}

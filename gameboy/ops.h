@@ -178,7 +178,7 @@ void shift_rot(struct cpu*);
 void bit_res_set(struct cpu*);
 
 static struct cpu_op op_list[256] = {
-	{"NOP", 1, nop},
+   {"NOP", 1, nop},
    {"LD BC, $%04X", 3, ld_r16_u16},
    {"LD (BC), A", 1, ld_r16_a},
    {"INC BC", 1, inc_r16},

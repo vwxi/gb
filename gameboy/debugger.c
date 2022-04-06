@@ -4,7 +4,7 @@ void dbg_print_cpu_data(struct cpu* cpu, u8 op)
 {
 #ifdef _DEBUG
 	printf("AF=%04X BC=%04X DE=%04X "
-		"HL=%04X PC=%04X SP=%04X FL=%c%c%c%c iTIMA=%04X DIV=%02X TIMA=%02X : ",
+		"HL=%04X PC=%04X SP=%04X FL=%c%c%c%c iTIMA=%04X DIV=%02X TIMA=%02X (%02X %02X %02X %02X) : ",
 		cpu->AF, cpu->BC, cpu->DE,
 		cpu->HL, cpu->PC - 1, cpu->SP,
 		ISF(ZF) ? 'Z' : '-',
@@ -12,7 +12,11 @@ void dbg_print_cpu_data(struct cpu* cpu, u8 op)
 		ISF(HF) ? 'H' : '-',
 		ISF(CF) ? 'C' : '-',
 		cpu->tima_internal,
-		cpu->div, cpu->tima
+		cpu->div, cpu->tima,
+		READ(cpu->PC - 1),
+		READ(cpu->PC),
+		READ(cpu->PC + 1),
+		READ(cpu->PC + 2)
 	);
 
 	if (op != 0xcb) {
@@ -26,7 +30,7 @@ void dbg_print_cpu_data(struct cpu* cpu, u8 op)
 		}
 	}
 	else {
-		printf(op_cb_list[op].name);
+		printf(op_cb_list[READ(cpu->PC)].name);
 	}
 
 	printf("\n");

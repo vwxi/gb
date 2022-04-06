@@ -85,6 +85,11 @@ int cart_get_mbc_type(struct cart* cart)
 		cart->MBC = 3;
 		puts("mapper: mbc3");
 		break;
+	case 0x19: case 0x1a: case 0x1b:
+	case 0x1c: case 0x1d: case 0x1e:
+		cart->MBC = 5;
+		puts("mapper: mbc5");
+		break;
 	default:
 		printf("unsupported, type: %x\n", cart->ROM[0x147]);
 		cart->MBC = 0xff;
@@ -114,25 +119,31 @@ void nombc_write(struct cart* cart, u16 addr, u8 val)
 u8 mbc1_read(struct cart* cart, u16 addr)
 {
 	/* rom bank 00 */
-	if (addr <= 0x3fff)
+	if (addr <= 0x3fff) {
 		if (cart->mode_select)
 			return cart->ROM[addr + (cart->zero_bank * 0x4000)];
 		else
 			return cart->ROM[addr];
+	}
 
 	/* rom bank 01-7f */
 	if (addr >= 0x4000 && addr <= 0x7fff)
 		return cart->ROM[(addr - 0x4000) + (cart->high_bank * 0x4000)];
 	
 	/* ram bank 00-03 */
-	if (addr >= 0xa000 && addr <= 0xbfff)
-		if (cart->ram_enable && cart->RAM)
-			if (cart->ram_bank_count <= 2)
+	if (addr >= 0xa000 && addr <= 0xbfff) {
+		if (cart->ram_enable && cart->RAM) {
+			if (cart->ram_bank_count <= 2) {
 				return cart->RAM[(addr - 0xa000) % cart->ram_size];
-			else if (cart->ram_bank_count == 3 && cart->mode_select)
+			}
+			else if (cart->ram_bank_count == 3 && cart->mode_select) {
 				return cart->RAM[(addr - 0xa000) + (cart->ram_bank * 0x2000)];
-			else
+			}
+			else {
 				return cart->RAM[addr - 0xa000];
+			}
+		}
+	}
 
 	return 0xff;
 }
@@ -173,15 +184,19 @@ void mbc1_write(struct cart* cart, u16 addr, u8 val)
 	if (addr >= 0x6000 && addr <= 0x7fff)
 		cart->mode_select = val & 1;
 
-	if (addr >= 0xa000 && addr <= 0xbfff)
-		if (cart->ram_enable && cart->RAM)
-			if (cart->ram_bank_count <= 2)
+	if (addr >= 0xa000 && addr <= 0xbfff) {
+		if (cart->ram_enable && cart->RAM) {
+			if (cart->ram_bank_count <= 2) {
 				cart->RAM[(addr - 0xa000) % cart->ram_size] = val;
-			else if (cart->ram_bank_count == 3 && cart->mode_select)
+			}
+			else if (cart->ram_bank_count == 3 && cart->mode_select) {
 				cart->RAM[(addr - 0xa000) + (cart->ram_bank * 0x2000)] = val;
-			else
+			}
+			else {
 				cart->RAM[addr - 0xa000] = val;
-
+			}
+		}
+	}
 }
 
 u8 mbc2_read(struct cart* cart, u16 addr)
@@ -195,9 +210,10 @@ u8 mbc2_read(struct cart* cart, u16 addr)
 		return cart->ROM[(addr - 0x4000) + (cart->rom_bank * 0x4000)];
 
 	/* internal RAM */
-	if (addr >= 0xa000 && addr <= 0xbfff)
+	if (addr >= 0xa000 && addr <= 0xbfff) {
 		if (cart->ram_enable)
 			return 0xf0 | cart->RAM[addr & 0x1ff];
+	}
 
 	return 0xff;
 }
@@ -279,7 +295,7 @@ u8 mbc3_read(struct cart* cart, u16 addr)
 	if (addr >= 0x4000 && addr <= 0x7fff)
 		return cart->ROM[(addr - 0x4000) + (cart->rom_bank * 0x4000)];
 
-	if (addr >= 0xa000 && addr <= 0xbfff)
+	if (addr >= 0xa000 && addr <= 0xbfff) {
 		if (cart->ram_enable) {
 			if (cart->rtc_supported && cart->rtc_mode)
 				switch (cart->rtc_register) {
@@ -289,9 +305,10 @@ u8 mbc3_read(struct cart* cart, u16 addr)
 				case 0x0b: return cart->rtc_days & 0xff; break;
 				case 0x0c: return cart->rtc_ctrl & 0xc1; break;
 				}
-			else if(cart->RAM && !cart->rtc_mode)
+			else if (cart->RAM && !cart->rtc_mode)
 				return cart->RAM[(addr - 0xa000) + (cart->ram_bank * 0x2000)];
 		}
+	}
 
 	return 0xff;
 }
@@ -342,6 +359,42 @@ void mbc3_write(struct cart* cart, u16 addr, u8 val)
 	}
 }
 
+u8 mbc5_read(struct cart* cart, u16 addr)
+{
+	if (addr <= 0x3fff)
+		return cart->ROM[addr];
+
+	if(addr >= 0x4000 && addr <= 0x7fff)
+		return cart->ROM[((addr - 0x4000) + (cart->rom_bank * 0x4000)) % cart->rom_size];
+
+	if(addr >= 0xa000 && addr <= 0xbfff) {
+		if (cart->RAM && cart->ram_enable)
+			return cart->RAM[(addr - 0xa000) + (cart->ram_bank * 0x2000)];
+	}
+
+	return 0xff;
+}
+
+void mbc5_write(struct cart* cart, u16 addr, u8 val)
+{
+	if (addr <= 0x1fff)
+		cart->ram_enable = (val & 0xf) == 0xa;
+
+	if (addr >= 0x2000 && addr <= 0x2fff)
+		cart->rom_bank = (cart->rom_bank & 0x100) | val;
+
+	if (addr >= 0x3000 && addr <= 0x3fff) 
+		cart->rom_bank = ((val & 1) << 8) | (cart->rom_bank & 0xff);
+
+	if (addr >= 0x4000 && addr <= 0x5fff)
+		cart->ram_bank = val & 0xf;
+
+	if (addr >= 0xa000 && addr <= 0xbfff) {
+		if (cart->RAM && cart->ram_enable)
+			cart->RAM[(addr - 0xa000) + (cart->ram_bank * 0x2000)] = val;
+	}
+}
+
 u8 cart_read(struct cart* cart, u16 addr)
 {
 	switch (cart->MBC) {
@@ -349,6 +402,7 @@ u8 cart_read(struct cart* cart, u16 addr)
 	case 1: return mbc1_read(cart, addr);
 	case 2: return mbc2_read(cart, addr);
 	case 3: return mbc3_read(cart, addr);
+	case 5: return mbc5_read(cart, addr);
 	}
 
 	return 0xff;
@@ -361,5 +415,6 @@ void cart_write(struct cart* cart, u16 addr, u8 val)
 	case 1: mbc1_write(cart, addr, val); break;
 	case 2: mbc2_write(cart, addr, val); break;
 	case 3: mbc3_write(cart, addr, val); break;
+	case 5: mbc5_write(cart, addr, val); break;
 	}
 }

@@ -28,16 +28,10 @@
 
 #define S_MODE 3
 #define S_LYC         (1 << 2)
+#define S_INT_HBLANK  (1 << 3)
+#define S_INT_VBLANK  (1 << 4)
+#define S_INT_OAM     (1 << 5)
 #define S_INT_LYC     (1 << 6)
-
-#define MODE(n, i) \
-	lcd->o_il = lcd->il; \
-	lcd->stat &= ~S_MODE; \
-	lcd->stat |= n; \
-	if((lcd->il && !lcd->o_il) && lcd->stat & (1 << i)) { \
-		lcd->il = 1; \
-		lcd->cpu->IF |= STAT_INTERRUPT; \
-	}
 
 #define lREAD(a) mmu_read(lcd->cpu->mmu, a)
 #define lWRITE(a,w) mmu_write(lcd->cpu->mmu, a, w)
@@ -69,9 +63,6 @@ struct lcd {
 	u8 wy;
 	u8 wx;
 	u8 wilc; /* internal line counter */
-
-	u8 il; /* interrupt on line */
-	u8 o_il;
 
 	SDL_Window* window;
 	SDL_Renderer* renderer;
