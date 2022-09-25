@@ -20,7 +20,7 @@ u8 lcd_init(struct lcd* lcd)
 		SDL_WINDOWPOS_CENTERED, 
 		320, 
 		288,
-		0
+		SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
 	);
 
 	if (!lcd->window) {
